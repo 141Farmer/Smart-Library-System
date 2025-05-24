@@ -3,7 +3,7 @@ from sqlalchemy.orm import sessionmaker
 from os import getenv
 from dotenv import load_dotenv
 from contextlib import contextmanager
-from application.database.Base import Base
+from database.Base import Base
 from typing import Type, Any
 
 class _Session:
