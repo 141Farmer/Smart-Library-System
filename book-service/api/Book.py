@@ -21,3 +21,7 @@ def update(id, updateInfo: UpdateBookAction):
 @router.delete("/deletebook/{id}")
 def delete(id):
     return book.delete(id)
+
+@router.put("/books/update_copy/{id}")
+def updateBookCopy(id, change):
+    return book.updateBookCopy(id, change)

@@ -59,7 +59,7 @@ class Book:
     def updateBookCopy(self, id, change):
         book=session_instance.read_one(BookTable,id)
         bookNumberAction=BookNumberAction(
-            available_copies=book.available_copies+change,
+            available_copies=book.available_copies+change.number,
             borrow_count=book.borrow_count+1
         )
         session_instance.update(BookTable, id, bookNumberAction)

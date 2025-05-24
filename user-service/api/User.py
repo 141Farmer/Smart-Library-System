@@ -13,3 +13,7 @@ def register(registerInfo: RegisterAction):
 @router.get("/users/{id}",  response_model=UserResponse)
 def getUser(id):
     return user.getUser(id)
+
+@router.put("/users/loan-number/{id}")
+def loanNumber(self, id, loan_number_info):
+    return user.loanNumber(id, loan_number_info)

@@ -31,14 +31,14 @@ class User:
             current_borrows=user.current_borrows
         )
 
-    def loanNumber(self, id, currentChange, totalChange):
+    def loanNumber(self, id, loan_number_info):
         user=session_instance.read_one(UserTable,id)
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
         userLoanAction=UserLoanAction(
-            current_borrows=user.current_borrows+currentChange,
-            books_borrowed=user.books_borrowed+totalChange
+            current_borrows=user.current_borrows+loan_number_info.currentChange,
+            books_borrowed=user.books_borrowed+loan_number_info.totalChange
         )
         session_instance.update(UserTable, id, userLoanAction)
 
