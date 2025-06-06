@@ -19,4 +19,4 @@ app.include_router(book_router)
 
 @app.get("/")
 async def root():
-    return {"message": "Hello, world!"}
+    return {"message": "Book service running at port 8002!"}
