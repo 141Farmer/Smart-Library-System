@@ -1,19 +1,19 @@
 from fastapi import APIRouter
 from core.User import User
-from schemas.User import RegisterAction, UserResponse
+from schemas.User import RegisterAction, UserResponse, DetailedUserResponse, UpdateAction
 
-router=APIRouter(prefix='',tags=['User'])
+router=APIRouter(prefix='/user-service/api',tags=['User'])
 
 user=User()
 
-@router.post("/users/")
-def register(registerInfo: RegisterAction):
-    return user.register(registerInfo)
+@router.post("/users/", response_model=UserResponse)
+def register(register_info: RegisterAction):
+    return user.register(register_info)
 
-@router.get("/users/{id}",  response_model=UserResponse)
-def getUser(id):
-    return user.getUser(id)
+@router.get("/users/{id}", response_model=DetailedUserResponse)
+def get_user(id):
+    return user.get_user(id)
 
-@router.put("/users/loan-number/{id}")
-def loanNumber(self, id, loan_number_info):
-    return user.loanNumber(id, loan_number_info)
+@router.put("/users/{id}", response_model=DetailedUserResponse)
+def update_user(id, update_info: UpdateAction):
+    return user.update_user(id, update_info)

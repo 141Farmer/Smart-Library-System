@@ -1,69 +1,85 @@
-from fastapi  import HTTPException
-from schemas.User import RegisterAction, UserResponse, MiniUserResponse, UserLoanAction
-#from schemas.Stats import ActiveUserResponse
-from models.User import User as UserTable
+from fastapi  import HTTPException, status
+from schemas.User import RegisterAction, UserResponse, DetailedUserResponse, UpdateAction
 from database.Session import session_instance
 from typing  import List
+from models.User import User as UserTable
 
 class User:
 
-    def register(self, registerInfo: RegisterAction):
-        user=UserTable(name=registerInfo.name,
-                    email=registerInfo.email,
-                    role=registerInfo.role
-        )
-        session_instance.write(user)
+    def register(self, register_info: RegisterAction) -> UserResponse:
+        try:
+            existing_user = session_instance.read_filter_one(UserTable, name=register_info.name)
+            if existing_user:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="User with this name already exists"
+                )
 
-        if user is not None:
-            raise HTTPException(status_code=201, detail="User registered successfully")
+            user = UserTable(
+                name=register_info.name,
+                email=register_info.email,
+                role=register_info.role
+            )
+            session_instance.write(user)
 
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+            new_user = session_instance.read_filter_one(UserTable, name=register_info.name)
+            if not new_user:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to create user"
+                )
 
-    def getUser(self, id) -> UserResponse:
-        user=session_instance.read_one(UserTable,id)
+            return UserResponse(
+                id=new_user.id,
+                name=new_user.name,
+                email=new_user.email,
+                role=new_user.role,
+                created_at=new_user.created_at
+            )
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Registration failed: {str(e)}"
+            )
+
+    def get_user(self, id: int) -> DetailedUserResponse:
+        user = session_instance.read_one(UserTable, id)
         if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-        return UserResponse(
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+    
+        return DetailedUserResponse(
+            id=user.id,
             name=user.name,
             email=user.email,
             role=user.role,
-            books_borrowed=user.books_borrowed,
-            current_borrows=user.current_borrows
+            created_at=user.created_at,
+            updated_at=user.updated_at
         )
 
-    def loanNumber(self, id, loan_number_info):
-        user=session_instance.read_one(UserTable,id)
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        userLoanAction=UserLoanAction(
-            current_borrows=user.current_borrows+loan_number_info.currentChange,
-            books_borrowed=user.books_borrowed+loan_number_info.totalChange
-        )
-        session_instance.update(UserTable, id, userLoanAction)
-
-
-    def getMiniUser(self, id) -> MiniUserResponse:
-        user=session_instance.read_one(UserTable,id)
-        return MiniUserResponse(
-            id=user.id,
-            name=user.name,
-            email=user.email
-        )
-    '''
-    def getActiveUsers(self) -> List[ActiveUserResponse]:
-        users=session_instance.read_all(UserTable)
-        miniUsers=[]
-        for  user in users:
-            miniUsers.append(
-                ActiveUserResponse(
-                    user_id=user.id,
-                    name=user.name,
-                    books_borrowed=user.books_borrowed,
-                    current_borrows=user.current_borrows
+    def update_user(self, id: int, update_info: UpdateAction) -> DetailedUserResponse:
+        try:
+            user = session_instance.update(UserTable, id, update_info)
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found"
                 )
+            
+            return DetailedUserResponse(
+                id=user.id,
+                name=user.name,
+                email=user.email,
+                role=user.role,
+                created_at=user.created_at,
+                updated_at=user.updated_at
             )
-        return miniUsers
-    '''
-    def getTotalUser(self):
-        return session_instance.count_all(UserTable)
+        
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Update failed: {str(e)}"
+            )

@@ -1,4 +1,5 @@
 from pydantic  import BaseModel
+from datetime import  datetime
 
 class RegisterAction(BaseModel):
     name: str
@@ -6,17 +7,20 @@ class RegisterAction(BaseModel):
     role: str
 
 class UserResponse(BaseModel):
-    name: str
-    email: str
-    role: str
-    books_borrowed:  int
-    current_borrows: int
-
-class MiniUserResponse(BaseModel):
     id: int
     name: str
     email: str
+    role: str
+    created_at: datetime
 
-class UserLoanAction(BaseModel):
-    books_borrowed: int
-    current_borrows: int
+class DetailedUserResponse(BaseModel):
+    id: int
+    name: str
+    email: str
+    role: str
+    created_at: datetime
+    updated_at: datetime | None
+
+class UpdateAction(BaseModel):
+    name: str
+    email: str

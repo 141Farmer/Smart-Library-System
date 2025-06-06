@@ -19,4 +19,6 @@ app.include_router(user_router)
 
 @app.get("/")
 async def root():
-    return {"message": "Application running at port 8001!"}
+    return {
+        "message": "user-service running at port 8001!"
+    }

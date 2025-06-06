@@ -1,12 +1,18 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, DateTime, Enum
+from datetime import datetime
 from database.Base import Base
+from typing import Optional
+from enum import Enum as Enums
 
+class UserRole(str, Enums):
+    STUDENT = "student"
+    FACULTY = "faculty"
 
 class User(Base):
-    __tablename__='users'
-    id: int=Column(Integer,primary_key=True)
-    name: str=Column(String(30),unique=True,nullable=False)
-    email: str=Column(String(30),nullable=False)
-    role: str=Column(String(20),nullable=False)
-    books_borrowed: int=Column(Integer, default=0)
-    current_borrows: int=Column(Integer, default=0)
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(30), unique=True, nullable=False)
+    email = Column(String(30), nullable=False)
+    role = Column(Enum(UserRole), nullable=False, default=UserRole.STUDENT)  # Fixed
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=None, onupdate=datetime.utcnow)
