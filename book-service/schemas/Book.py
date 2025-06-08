@@ -7,6 +7,23 @@ class AddBookAction(BaseModel):
     isbn: str
     copies: int
 
+class BookResponse(BaseModel):
+    id: int
+    title: str
+    author: str
+    isbn: str
+    copies: int
+    available_copies: int
+    created_at: datetime
+
+class SearchBookResponse(BaseModel):
+    id: int
+    title: str
+    author: str
+    isbn: str
+    copies: int
+    available_copies: int
+
 class DetailedBookResponse(BaseModel):
     id: int
     title: str
@@ -19,13 +36,15 @@ class DetailedBookResponse(BaseModel):
 
 class UpdateBookAction(BaseModel):
     copies: int
+   
+class BookAvailabiltyAction(BaseModel):
     available_copies: int
+    operation: str
 
-class MiniBookResponse(BaseModel):
+class BookAvailabiltyResponse(BaseModel):
     id: int
-    title: str
-    author: str
-
-class BookNumberAction(BaseModel):
     available_copies: int
-    borrow_count: int
+    updated_at: datetime
+
+class AvailableCopyAction(BaseModel):
+    available_copies: int

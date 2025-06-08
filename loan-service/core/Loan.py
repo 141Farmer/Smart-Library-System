@@ -1,19 +1,17 @@
 from fastapi  import HTTPException
-from schemas.Loan import LoanResponse, LoanAction, LoanIdAction, ReturnResponse, ReturnUpdateAction, LoanOfUserResponse, OverdueResponse, ExtendedLoanResponse, UpdateLoanAction
+from schemas.Loan import LoanResponse, LoanAction, LoanIdAction, ReturnResponse, ReturnUpdateAction, UsersLoanHistoryResponse, SpecificLoanResponse
 from models.Loan import Loan as LoanTable
 from database.Session import session_instance
 from typing import List
 from datetime import datetime, timezone, timedelta
 from core.ExternalService  import ExternalService
-#from application.crud.User import User
-#from application.crud.Book import Book
 
 class Loan:
 
-    def issueloan(self, loanInfo: LoanAction) -> LoanResponse:
-        loan=LoanTable(user_id=loanInfo.user_id,
-                        book_id=loanInfo.book_id,
-                        original_due_date=loanInfo.due_date
+    def issue_loan(self, loan_info: LoanAction) -> LoanResponse:
+        loan=LoanTable(user_id=loan_info.user_id,
+                        book_id=loan_info.book_id,
+                        original_due_date=loan_info.due_date
                     )
         session_instance.write(loan)
         if loan:
@@ -32,18 +30,19 @@ class Loan:
         raise HTTPException(status_code=500, detail="Database error while issuing loan")
 
 
-    def returns(self,  loanId: LoanIdAction) -> ReturnResponse:
-        loan=session_instance.read_one(LoanTable, loanId.loan_id)
+    def returns(self,  loan_id: LoanIdAction) -> ReturnResponse:
+        loan=session_instance.read_one(LoanTable, loan_id.loan_id)
         updates=ReturnUpdateAction(
             status="RETURNED",
             return_date=datetime.now(timezone.utc)
         )
     
-        updatedLoan=session_instance.update(LoanTable,loanId.loan_id,updates)
+        updated_loan=session_instance.update(LoanTable,loan_id.loan_id,updates)
 
-        if not updatedLoan:
+        if not updated_loan:
             raise HTTPException(status_code=500, detail="Database error while issuing loan")
         
+        '''
         user=User()
         user.loanNumber(loan.user_id, -1, 0)
         book=Book()
@@ -58,9 +57,10 @@ class Loan:
                 return_date=updatedLoan.return_date,
                 status=updatedLoan.status
             )
+            '''
         
     
-    def getLoansUser(self, user_id) -> List[LoanOfUserResponse]:
+    def get_user_loan_history(self, user_id) -> UsersLoanHistoryResponse:
         loans=session_instance.read_filter_all(LoanTable, user_id=user_id)
         loanResponses=[]
         for loan in loans:

@@ -1,13 +1,12 @@
 from fastapi import HTTPException
-from schemas.Book import AddBookAction, DetailedBookResponse, BookNumberAction, MiniBookResponse
-#from schemas.Stats import PopularBookResponse
+from schemas.Book import AddBookAction, BookResponse, DetailedBookResponse, BookAvailabiltyResponse, AvailableCopyAction
 from models.Book import Book as BookTable
 from database.Session import session_instance
 from typing import List
 
 class Book:
 
-    def add(self, bookInfo: AddBookAction):
+    def add(self, bookInfo: AddBookAction) -> BookResponse:
         book=BookTable(title=bookInfo.title,
                         author=bookInfo.author,
                         isbn=bookInfo.isbn,
@@ -15,11 +14,19 @@ class Book:
                     )
         session_instance.write(book)
         if book is not None:
-            raise HTTPException(status_code=201, detail="Book added successfully")
+            return BookResponse(
+                id=book.id,
+                title=book.title,
+                author=book.author,
+                isbn=book.isbn,
+                copies=book.copies,
+                available_copies=book.available_copies,
+                created_at=book.created_at
+            )
 
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-    def getBook(self, id) -> DetailedBookResponse:
+    def get_book(self, id) -> DetailedBookResponse:
         book=session_instance.read_one(BookTable,id)
         if not book:
             raise HTTPException(status_code=404, detail="Book not found")
@@ -34,75 +41,43 @@ class Book:
             updated_at=book.updated_at
         )
 
-    def update(self, id, updateInfo) -> DetailedBookResponse:
+    def update_book(self, id, update_info) -> DetailedBookResponse:
         book=session_instance.read_one(BookTable,id)
         if not book:
             raise HTTPException(status_code=404, detail="Book not found")
-        updatedBook=session_instance.update(BookTable, id, updateInfo)
+        updated_book=session_instance.update(BookTable, id, update_info)
         return DetailedBookResponse(
-            id=book.id,
-            title=updatedBook.title,
-            author=updatedBook.author,
-            isbn=updatedBook.isbn,
-            copies=updatedBook.copies,
-            available_copies=updatedBook.available_copies,
-            created_at=updatedBook.created_at,
-            updated_at=updatedBook.updated_at
+            id=updated_book.id,
+            title=updated_book.title,
+            author=updated_book.author,
+            isbn=updated_book.isbn,
+            copies=updated_book.copies,
+            available_copies=updated_book.available_copies,
+            created_at=updated_book.created_at,
+            updated_at=updated_book.updated_at
         )
     
-    def delete(self,  id) :
+    def delete(self, id) :
         if session_instance.delete(BookTable, id):
             return {"message": "204  no  content"}
-        else:
-            return {"message": "Book not found"}
+        
+        return {"message": "Book not found"}
 
-    def updateBookCopy(self, id, change):
+    def book_availability(self, id, availability_info):
         book=session_instance.read_one(BookTable,id)
-        bookNumberAction=BookNumberAction(
-            available_copies=book.available_copies+change.number,
-            borrow_count=book.borrow_count+1
-        )
-        session_instance.update(BookTable, id, bookNumberAction)
+        if availability_info.operation == 'decrement' and book.available_copies<=0:
+            raise HTTPException(status_code=404, detail="Book not available")
 
-    def getMiniBook(self, id) -> List[MiniBookResponse]:
-        book=session_instance.read_one(BookTable, id)
-        if not book:
-            raise HTTPException(status_code=404, detail="Book not found")
-
-        return MiniBookResponse(
-            id=book.id,
-            title=book.title,
-            author=book.author,
+        change=availability_info.available_copies if availability_info.operation == 'increment' else -availability_info.available_copies
+        
+        available_copy_action=AvailableCopyAction(
+            available_copies=change
         )
 
-    '''
-    def getMiniBooks(self) -> List[PopularBookResponse]:
-        books=session_instance.read_all(BookTable)
-        miniBooks=[]
-        for book  in books:
-            miniBooks.append(
-                PopularBookResponse(
-                    book_id=book.id,
-                    title=book.title,
-                    author=book.author,
-                    borrow_count=book.borrow_count
-                )
-            )
-        return miniBooks
-    '''
-    def getTotalBooks(self):
-        return session_instance.count_all(BookTable)
-
-    def getTotalAvailableBooks(self):
-        books=session_instance.read_all(BookTable)
-        count=0
-        for book in books:
-            count+=book.available_copies
-        return count
-
-    def getTotalBorrowedBooks(self):
-        books=session_instance.read_all(BookTable)
-        count=0
-        for book in books:
-            count+=book.borrow_count
-        return count
+        updated_book=session_instance.update(BookTable, id, available_copy_action)
+        
+        return BookAvailabiltyResponse(
+            id=updated_book.id,
+            available_copies=updated_book.available_copies,
+            updated_at=updated_book.updated_at
+        )

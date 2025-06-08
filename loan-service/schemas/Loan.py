@@ -1,5 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel
+from  typing import List
 
 
 class LoanAction(BaseModel):
@@ -24,7 +25,7 @@ class ReturnResponse(BaseModel):
     book_id:  int
     issue_date: datetime
     due_date: datetime
-    return_date: datetime
+    return_date: datetime | None
     status: str
 
 class MiniBookResponse(BaseModel):
@@ -36,6 +37,27 @@ class MiniUserResponse(BaseModel):
     id: int
     name: str
     email: str
+
+class  LoanHistoryResponse(BaseModel):
+    id:  int
+    book: MiniBookResponse
+    issue_date: datetime
+    due_date: datetime
+    return_date: datetime | None
+    status: str
+
+class UsersLoanHistoryResponse(BaseModel):
+    loans: List[LoanHistoryResponse]
+    total: int
+
+class SpecificLoanResponse(BaseModel):
+    id:  int
+    user: MiniUserResponse
+    book: MiniBookResponse
+    issue_date: datetime
+    due_date: datetime
+    return_date: datetime | None
+    status: str
 
 class LoanOfUserResponse(BaseModel):
     id: int
