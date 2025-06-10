@@ -54,7 +54,6 @@ class _Session:
             return session.get(model_cls,id)
 
     def query_filter(self, model_cls: Type, **filters: Any):
-        print("filters",filters)
         with self.get_session() as session:
             query=session.query(model_cls)
             for key, value in filters.items():
@@ -99,11 +98,14 @@ class _Session:
             session.refresh(instance)
             return instance
 
-    def count_all(self, model_cls):
+    def count_all(self, model_cls) -> int:
         with self.get_session() as session:
-            return session.query(model_cls).count()
+            count = session.query(model_cls).count()
+            return count if count is not None else 0  # Ensure always returns int
 
-    def count_filter(self, model_cls, **filters: any):
-        self.query_filter(model_cls,**filters).count()
+    def count_filter(self, model_cls, **filters: any) -> int:
+        with self.get_session() as session:
+            count = self.query_filter(model_cls, **filters).count()
+            return count if count is not None else 0  # Ensure always returns int
 
 session_instance=_Session()

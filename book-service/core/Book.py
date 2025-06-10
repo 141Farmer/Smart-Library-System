@@ -23,13 +23,14 @@ class Book:
                 available_copies=book.available_copies,
                 created_at=book.created_at
             )
-
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        
+        raise HTTPException(status_code=400, detail="Bad Request: Book could not be created")
 
     def get_book(self, id) -> DetailedBookResponse:
         book=session_instance.read_one(BookTable,id)
         if not book:
             raise HTTPException(status_code=404, detail="Book not found")
+        
         return DetailedBookResponse(
             id=book.id,
             title=book.title,
@@ -45,6 +46,7 @@ class Book:
         book=session_instance.read_one(BookTable,id)
         if not book:
             raise HTTPException(status_code=404, detail="Book not found")
+        
         updated_book=session_instance.update(BookTable, id, update_info)
         return DetailedBookResponse(
             id=updated_book.id,
@@ -57,21 +59,24 @@ class Book:
             updated_at=updated_book.updated_at
         )
     
-    def delete(self, id) :
+    def delete(self, id):
         if session_instance.delete(BookTable, id):
-            return {"message": "204  no  content"}
+            raise HTTPException(status_code=204)
         
-        return {"message": "Book not found"}
+        raise HTTPException(status_code=404, detail="Book not found")
 
     def book_availability(self, id, availability_info):
         book=session_instance.read_one(BookTable,id)
+        if not book:
+            raise HTTPException(status_code=404, detail="Book not found")
+        
         if availability_info.operation == 'decrement' and book.available_copies<=0:
-            raise HTTPException(status_code=404, detail="Book not available")
+            raise HTTPException(status_code=400, detail="Book not available")
 
         change=availability_info.available_copies if availability_info.operation == 'increment' else -availability_info.available_copies
         
         available_copy_action=AvailableCopyAction(
-            available_copies=change
+            available_copies=book.available_copies+change
         )
 
         updated_book=session_instance.update(BookTable, id, available_copy_action)

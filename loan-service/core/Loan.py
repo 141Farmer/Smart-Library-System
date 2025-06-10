@@ -1,152 +1,197 @@
-from fastapi  import HTTPException
-from schemas.Loan import LoanResponse, LoanAction, LoanIdAction, ReturnResponse, ReturnUpdateAction, UsersLoanHistoryResponse, SpecificLoanResponse
+from fastapi  import HTTPException,  status
+from schemas.Loan import LoanResponse, LoanAction, ReturnAction,  ReturnResponse, UsersLoanHistoryResponse, SpecificLoanResponse, LoanHistoryResponse, ReturnUpdateAction
 from models.Loan import Loan as LoanTable
 from database.Session import session_instance
 from typing import List
 from datetime import datetime, timezone, timedelta
 from core.ExternalService  import ExternalService
+import asyncio
 
 class Loan:
 
-    def issue_loan(self, loan_info: LoanAction) -> LoanResponse:
-        loan=LoanTable(user_id=loan_info.user_id,
-                        book_id=loan_info.book_id,
-                        original_due_date=loan_info.due_date
-                    )
-        session_instance.write(loan)
-        if loan:
-            ExternalService.update_user_loan_number(loan.user_id, 1, 1)
-            ExternalService.update_book_number_copy(loan.book_id,-1)
-
-            return LoanResponse(
-                id=loan.id,
-                user_id=loan.user_id,
-                book_id=loan.book_id,
-                issue_date=loan.issue_date,
-                due_date=loan.original_due_date,
-                status=loan.status
+    async def issue_loan(self, loan_info: LoanAction) -> LoanResponse:
+        user_exists = await ExternalService.check_user(loan_info.user_id)
+        if user_exists is False:  
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        elif user_exists is None:  
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="User service unavailable"
             )
 
-        raise HTTPException(status_code=500, detail="Database error while issuing loan")
+        book_exists = await ExternalService.check_book(loan_info.book_id)
+        if book_exists is False:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Book not found"
+            )
+        elif book_exists is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Book service unavailable"
+            )
 
+        update_success = await ExternalService.update_book_number_copy(loan_info.book_id, 'decrement')
+        if update_success is False:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Not enough copies available"
+            )
+        elif update_success is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Book service unavailable"
+            )
 
-    def returns(self,  loan_id: LoanIdAction) -> ReturnResponse:
-        loan=session_instance.read_one(LoanTable, loan_id.loan_id)
-        updates=ReturnUpdateAction(
+        # Only proceed if all checks passed
+        loan = LoanTable(
+            user_id=loan_info.user_id,
+            book_id=loan_info.book_id,
+            due_date=loan_info.due_date
+        )
+        
+        session_instance.write(loan)
+        
+        if not loan:   
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create loan"
+            )
+
+        return LoanResponse(
+            id=loan.id,
+            user_id=loan.user_id,
+            book_id=loan.book_id,
+            issue_date=loan.issue_date,
+            due_date=loan.due_date,
+            status=loan.status
+        )
+
+    async def returns(self, loan_id: ReturnAction) -> ReturnResponse:
+        # Check loan exists
+        loan = session_instance.read_one(LoanTable, loan_id.loan_id)
+        if not loan:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Loan not found"
+            )
+
+        # Update loan status
+        updates = ReturnUpdateAction(
             status="RETURNED",
             return_date=datetime.now(timezone.utc)
         )
-    
-        updated_loan=session_instance.update(LoanTable,loan_id.loan_id,updates)
-
-        if not updated_loan:
-            raise HTTPException(status_code=500, detail="Database error while issuing loan")
         
-        '''
-        user=User()
-        user.loanNumber(loan.user_id, -1, 0)
-        book=Book()
-        book.updateBookCopy(loan.book_id, 1)
+        updated_loan = session_instance.update(LoanTable, loan_id.loan_id, updates)
+        if not updated_loan:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update loan status"
+            )
+
+        # Update book inventory (with proper await)
+        update_result = await ExternalService.update_book_number_copy(loan.book_id, 'increment')
+        if update_result is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Book service unavailable"
+            )
+        if update_result is False:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Failed to update book inventory"
+            )
 
         return ReturnResponse(
-                id=updatedLoan.id,
-                user_id=updatedLoan.user_id,
-                book_id=updatedLoan.book_id,
-                issue_date=updatedLoan.issue_date,
-                due_date=updatedLoan.original_due_date,
-                return_date=updatedLoan.return_date,
-                status=updatedLoan.status
+            id=updated_loan.id,
+            user_id=updated_loan.user_id,
+            book_id=updated_loan.book_id,
+            issue_date=updated_loan.issue_date,
+            due_date=updated_loan.due_date,
+            return_date=updated_loan.return_date,
+            status=updated_loan.status
+        )
+
+    async def get_user_loan_history(self, user_id: int) -> UsersLoanHistoryResponse:
+    # Check user exists (with await)
+        user_exists = await ExternalService.check_user(user_id)
+        if user_exists is False:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
             )
-            '''
-        
-    
-    def get_user_loan_history(self, user_id) -> UsersLoanHistoryResponse:
-        loans=session_instance.read_filter_all(LoanTable, user_id=user_id)
-        loanResponses=[]
+        elif user_exists is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="User service unavailable"
+            )
+
+        # Get loans from database
+        loans = session_instance.read_filter_all(LoanTable, user_id=user_id)
+        total = session_instance.count_filter(LoanTable, user_id=user_id)
+
+        # Process loans with async book info
+        loan_responses = []
         for loan in loans:
-            book=Book()
-            loanResponses.append(
-                LoanOfUserResponse(
+            book = await ExternalService.get_mini_book(loan.book_id)
+            if book is None:  # Service error
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Book service unavailable"
+                )
+            
+            loan_responses.append(
+                LoanHistoryResponse(
                     id=loan.id,
-                    book=book.getMiniBook(loan.book_id),
+                    book=book,
                     issue_date=loan.issue_date,
-                    due_date=loan.original_due_date,
+                    due_date=loan.due_date,
                     return_date=loan.return_date,
                     status=loan.status,
                 )
             )
-        return loanResponses
 
+        return UsersLoanHistoryResponse(
+            loans=loan_responses,
+            total=int(total)
+        )
 
-    def getAllOverdueLoans(self) -> List[OverdueResponse]:
-        loans=session_instance.read_filter_all(LoanTable,status="ACTIVE")
-        user=User()
-        book=Book()
-        overDueLoans=[]
-        for loan in loans:
-            due_date=loan.extended_due_date if loan.extended_due_date else loan.original_due_date
-
-            days_overdue=(datetime.utcnow().date()-due_date.date()).days
-            if days_overdue<0:
-                continue
-                
-            overDueLoans.append(
-                OverdueResponse(
-                    id=loan.id,
-                    user=user.getMiniUser(loan.user_id),
-                    book=book.getMiniBook(loan.book_id),
-                    issue_date=loan.issue_date,
-                    due_date=due_date,
-                    days_overdue=days_overdue
-                )
+    async def get_specific_loan(self, id: int) -> SpecificLoanResponse:
+        loan = session_instance.read_one(LoanTable, id=id)
+        
+        if not loan:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Loan not found"
             )
-        return overDueLoans
-
-    def extendUserLoan(self, id, extendInfo) -> ExtendedLoanResponse:
-        loan=session_instance.read_one(LoanTable, id)
-
-        base_date = loan.extended_due_date if loan.extended_due_date else loan.original_due_date
-
-        updateInfo=UpdateLoanAction(
-            extension_days=extendInfo.extension_days,
-            extensions_count=loan.extension_count+1,
-            extended_due_date=base_date+timedelta(days=extendInfo.extension_days) 
-        )
-        updatedLoan=session_instance.update(LoanTable, id, updateInfo)
-
-        return ExtendedLoanResponse(
-            id=updatedLoan.id,
-            user_id=updatedLoan.user_id,
-            book_id=updatedLoan.book_id,
-            issue_date=updatedLoan.issue_date,
-            original_due_date=updatedLoan.original_due_date,
-            extended_due_date=updatedLoan.extended_due_date,
-            status=updatedLoan.status,
-            extensions_count=updatedLoan.extension_count
+        
+        # Get user and book info in parallel
+        user, book = await asyncio.gather(
+            ExternalService.get_mini_user(loan.user_id),
+            ExternalService.get_mini_book(loan.book_id)
         )
 
-    def getTotalOverdueLoans(self):
-        loans=session_instance.read_filter_all(LoanTable,status="ACTIVE")
-        count=0
-        for loan in loans:
-            due_date=loan.extended_due_date if loan.extended_due_date else loan.original_due_date
-            days_overdue=(datetime.utcnow().date()-due_date.date()).days
-            if days_overdue<0:
-                count+=1
-        return count
+        # Check for service errors
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="User service unavailable"
+            )
+        if book is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Book service unavailable"
+            )
 
-    def getLoansToday(self):
-        loans=session_instance.read_all(LoanTable)
-        count=0
-        for loan in loans:
-            if loan.issue_date.date()==datetime.utcnow().date():
-                count+=1
-        return count
-
-    def getReturnsToday(self):
-        loans=session_instance.read_all(LoanTable)
-        count=0
-        for loan in loans:
-            if loan.return_date and loan.return_date.date()==datetime.utcnow().date():
-                count+=1
-        return count
+        return SpecificLoanResponse(
+            id=loan.id,
+            user=user,
+            book=book,
+            issue_date=loan.issue_date,
+            due_date=loan.due_date,
+            return_date=loan.return_date,
+            status=loan.status
+        )
