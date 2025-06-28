@@ -12,3 +12,8 @@ docker rm container-name
 
 docker kill $(docker ps -q)  # Kills all running containers
 docker rm $(docker ps -aq)   # Removes all containers
+
+
+docker compose up -d
+docker compose stop
+docker compose restart

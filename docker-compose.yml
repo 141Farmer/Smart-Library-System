@@ -1,0 +1,16 @@
+services:
+  user-services:
+    image: user-service-docker-app
+    build:
+      context: .
+    network_mode: host
+  book-services:
+    image: book-service-docker-app
+    build:
+      context: .
+    network_mode: host
+  loan-services:
+    image: loan-service-docker-app
+    build:
+      context: .
+    network_mode: host
