@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from core.User import User
 from schemas.User import RegisterAction, UserResponse, DetailedUserResponse, UpdateAction
 
-router=APIRouter(prefix='/user-service/api',tags=['User'])
+router=APIRouter(prefix='/api',tags=['User'])
 
 user=User()
 

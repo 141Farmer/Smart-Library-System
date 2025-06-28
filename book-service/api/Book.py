@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from core.Book import Book
 from schemas.Book import AddBookAction, DetailedBookResponse, BookResponse, UpdateBookAction, BookAvailabiltyAction, BookAvailabiltyResponse
 
-router=APIRouter(prefix='/book-service/api',tags=['Book'])
+router=APIRouter(prefix='/api',tags=['Book'])
 
 book=Book()
 

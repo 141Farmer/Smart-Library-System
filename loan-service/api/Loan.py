@@ -4,7 +4,7 @@ from core.ExternalService import ExternalService
 from schemas.Loan import LoanAction, LoanResponse, ReturnResponse,  ReturnAction, UsersLoanHistoryResponse, SpecificLoanResponse, MiniUserResponse, MiniBookResponse
 from typing import List
 
-router=APIRouter(prefix='',tags=['Loan'])
+router=APIRouter(prefix='/api',tags=['Loan'])
 
 loan=Loan()
 
