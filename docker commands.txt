@@ -1,9 +1,14 @@
+docker ps
+docker container ls
+
 docker build -t loan-service-docker-app .
 docker run -d --name loan-service-container -p 8003:8003 loan-service-docker-app
+docker run -d --name loan-service-container --network host loan-service-docker-app
 
-docker ps
+docker logs container-name
 docker stop container-name
 docker rm container-name
+
 
 docker kill $(docker ps -q)  # Kills all running containers
 docker rm $(docker ps -aq)   # Removes all containers
