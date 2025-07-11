@@ -1,16 +1,73 @@
+
 services:
+  postgres:
+    image: postgres
+    container_name: postgres
+    environment:
+      POSTGRES_PASSWORD: post
+      POSTGRES_DB: dbmicro
+    network_mode: host
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d dbmicro"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
   user-services:
+    build:
+      context: ./user-services
+      dockerfile: Dockerfile
     image: user-service-docker-app
-    build:
-      context: .
+    container_name: user-services
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://postgres:post@localhost:5432/dbmicro"
     network_mode: host
+
   book-services:
+    build:
+      context: ./book-services
+      dockerfile: Dockerfile
     image: book-service-docker-app
-    build:
-      context: .
+    container_name: book-services
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://postgres:post@localhost:5432/dbmicro"
     network_mode: host
+
   loan-services:
-    image: loan-service-docker-app
     build:
-      context: .
+      context: ./loan-services
+      dockerfile: Dockerfile
+    image: loan-service-docker-app
+    container_name: loan-services
+    depends_on:
+      postgres:
+        condition: service_healthy
+      user-services:
+        condition: service_started
+      book-services:
+        condition: service_started
+    environment:
+      DATABASE_URL: "postgresql://postgres:post@localhost:5432/dbmicro"
     network_mode: host
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - user-services
+      - book-services
+      - loan-services
+    network_mode: host
+
+volumes:
+  postgres_data:
